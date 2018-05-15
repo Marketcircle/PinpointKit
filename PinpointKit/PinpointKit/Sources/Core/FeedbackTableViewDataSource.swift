@@ -13,6 +13,7 @@ final class FeedbackTableViewDataSource: NSObject, UITableViewDataSource {
     
     private let sections: [Section]
     private weak var delegate: FeedbackTableViewDataSourceDelegate?
+    private var includeScreenshot: Bool = true
     
     /**
      Initializes the data source with a configuration and a boolean value indicating whether the user has enabled log collection.
@@ -23,8 +24,8 @@ final class FeedbackTableViewDataSource: NSObject, UITableViewDataSource {
      - parameter userEnabledLogCollection: A boolean value indicating whether the user has enabled log collection.
      - parameter delegate:                 The object informed when a screenshot is tapped.
      */
-    init(interfaceCustomization: InterfaceCustomization, screenshot: UIImage, logSupporting: LogSupporting, userEnabledLogCollection: Bool, delegate: FeedbackTableViewDataSourceDelegate? = nil) {
-        sections = type(of: self).sectionsFromConfiguration(interfaceCustomization, screenshot: screenshot, logSupporting: logSupporting, userEnabledLogCollection: userEnabledLogCollection)
+    init(interfaceCustomization: InterfaceCustomization, screenshot: UIImage, logSupporting: LogSupporting, userEnabledLogCollection: Bool, includeScreenshot: Bool, delegate: FeedbackTableViewDataSourceDelegate? = nil) {
+        sections = type(of: self).sectionsFromConfiguration(interfaceCustomization, screenshot: screenshot, logSupporting: logSupporting, userEnabledLogCollection: userEnabledLogCollection, includeScreenshot: includeScreenshot)
         self.delegate = delegate
     }
     
@@ -39,20 +40,25 @@ final class FeedbackTableViewDataSource: NSObject, UITableViewDataSource {
         }
     }
     
-    private enum Row {
+    internal enum Row {
         case screenshot(screensot: UIImage, hintText: String?, hintFont: UIFont)
         case collectLogs(enabled: Bool, title: String, font: UIFont, canView: Bool)
+        case includeScreenshot(enabled: Bool, title: String, font: UIFont)
+    }
+    
+    internal func rowType(forIndexPath indexPath: IndexPath) -> Row {
+        let section = sections[indexPath.section]
+        
+        switch section {
+        case let .feedback(rows):
+            return rows[indexPath.row]
+        }
     }
     
     // MARK: - FeedbackTableViewDataSource
     
-    private static func sectionsFromConfiguration(_ interfaceCustomization: InterfaceCustomization, screenshot: UIImage, logSupporting: LogSupporting, userEnabledLogCollection: Bool) -> [Section] {
+    private static func sectionsFromConfiguration(_ interfaceCustomization: InterfaceCustomization, screenshot: UIImage, logSupporting: LogSupporting, userEnabledLogCollection: Bool, includeScreenshot: Bool) -> [Section] {
         var sections: [Section] = []
-        
-        let screenshotRow = Row.screenshot(screensot: screenshot, hintText: interfaceCustomization.interfaceText.feedbackEditHint, hintFont: interfaceCustomization.appearance.feedbackEditHintFont)
-        let screenshotSection = Section.feedback(rows: [screenshotRow])
-        
-        sections.append(screenshotSection)
         
         if logSupporting.logCollector != nil {
             let collectLogsRow = Row.collectLogs(enabled: userEnabledLogCollection, title: interfaceCustomization.interfaceText.logCollectionPermissionTitle, font: interfaceCustomization.appearance.logCollectionPermissionFont, canView: logSupporting.logViewer != nil)
@@ -61,21 +67,37 @@ final class FeedbackTableViewDataSource: NSObject, UITableViewDataSource {
             sections.append(collectLogsSection)
         }
         
+        // Section to turn on/off screenshots
+        let collectScreenshotRow = Row.includeScreenshot(enabled: includeScreenshot, title: "Include Screenshot", font: interfaceCustomization.appearance.logCollectionPermissionFont)
+        let collectScreenshotSection = Section.feedback(rows: [collectScreenshotRow])
+        sections.append(collectScreenshotSection)
+        
+        if includeScreenshot {
+            let screenshotRow = Row.screenshot(screensot: screenshot, hintText: interfaceCustomization.interfaceText.feedbackEditHint, hintFont: interfaceCustomization.appearance.feedbackEditHintFont)
+            let screenshotSection = Section.feedback(rows: [screenshotRow])
+            
+            sections.append(screenshotSection)
+        }
+        
         return sections
     }
     
     private func checkmarkCell(for row: Row) -> CheckmarkCell {
         let cell = CheckmarkCell()
 
-        guard case let .collectLogs(enabled, title, font, canView) = row else {
+        if case let .collectLogs(enabled, title, font, canView) = row {
+            cell.textLabel?.text = title
+            cell.textLabel?.font = font
+            cell.accessoryType = canView ? .detailButton : .none
+            cell.isChecked = enabled
+        } else if case let .includeScreenshot(enabled, title, font) = row {
+            cell.textLabel?.text = title
+            cell.textLabel?.font = font
+            cell.isChecked = enabled
+        } else {
             assertionFailure("Found unexpected row type when creating checkmark cell.")
             return cell
         }
-        
-        cell.textLabel?.text = title
-        cell.textLabel?.font = font
-        cell.accessoryType = canView ? .detailButton : .none
-        cell.isChecked = enabled
         
         return cell
     }
@@ -118,6 +140,8 @@ final class FeedbackTableViewDataSource: NSObject, UITableViewDataSource {
             case .screenshot:
                 return screenshotCell(for: row)
             case .collectLogs:
+                return checkmarkCell(for: row)
+            case .includeScreenshot:
                 return checkmarkCell(for: row)
             }
         }

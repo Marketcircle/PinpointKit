@@ -71,7 +71,7 @@ public struct Feedback {
     }
     
     /// A screenshot of the screen the feedback relates to.
-    public let screenshot: ScreenshotType
+    public let screenshot: ScreenshotType?
     
     /// An optional collection of log strings.
     public let logs: [String]?
@@ -90,7 +90,7 @@ public struct Feedback {
      - parameter applicationInformation: Information about the application to be captured.
      - parameter configuration:          Configurable properties for feedback.
      */
-    public init(screenshot: ScreenshotType,
+    public init(screenshot: ScreenshotType?,
                 logs: [String]? = nil,
                 applicationInformation: ApplicationInformation? = nil,
                 configuration: FeedbackConfiguration) {

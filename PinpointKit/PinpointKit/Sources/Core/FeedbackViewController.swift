@@ -63,6 +63,12 @@ public final class FeedbackViewController: UITableViewController {
         }
     }
     
+    fileprivate var includeScreenshot = true {
+        didSet {
+            updateDataSource()
+        }
+    }
+    
     public required init() {
         super.init(style: .grouped)
     }
@@ -105,7 +111,7 @@ public final class FeedbackViewController: UITableViewController {
         guard let screenshot = screenshot else { assertionFailure(); return }
         let screenshotToDisplay = annotatedScreenshot ?? screenshot
 
-        dataSource = FeedbackTableViewDataSource(interfaceCustomization: interfaceCustomization, screenshot: screenshotToDisplay, logSupporting: self, userEnabledLogCollection: userEnabledLogCollection, delegate: self)
+        dataSource = FeedbackTableViewDataSource(interfaceCustomization: interfaceCustomization, screenshot: screenshotToDisplay, logSupporting: self, userEnabledLogCollection: userEnabledLogCollection, includeScreenshot: includeScreenshot, delegate: self)
     }
     
     private func updateInterfaceCustomization() {
@@ -155,7 +161,9 @@ public final class FeedbackViewController: UITableViewController {
         
         let feedback: Feedback?
         
-        if let screenshot = annotatedScreenshot {
+        if !includeScreenshot {
+            feedback = Feedback(screenshot: nil, configuration: feedbackConfiguration)
+        } else if let screenshot = annotatedScreenshot {
             feedback = Feedback(screenshot: .annotated(image: screenshot), logs: logs, configuration: feedbackConfiguration)
         } else if let screenshot = screenshot {
             feedback = Feedback(screenshot: .original(image: screenshot), logs: logs, configuration: feedbackConfiguration)
@@ -210,8 +218,18 @@ extension FeedbackViewController {
     }
     
     public override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        userEnabledLogCollection = !userEnabledLogCollection
-        tableView.reloadRows(at: [indexPath], with: .automatic)
+        guard let dataSource = dataSource else { return }
+        
+        switch dataSource.rowType(forIndexPath: indexPath) {
+        case .collectLogs:
+            userEnabledLogCollection = !userEnabledLogCollection
+            tableView.reloadRows(at: [indexPath], with: .automatic)
+        case .includeScreenshot:
+            includeScreenshot = !includeScreenshot
+            tableView.reloadData()
+        case .screenshot:
+            break
+        }
     }
     
     public override func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
